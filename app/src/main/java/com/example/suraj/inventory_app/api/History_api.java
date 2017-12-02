@@ -66,13 +66,28 @@ public class History_api extends AsyncTask<String,String,String> {
             JSONArray array=obj.getJSONArray("result");
             for(int i=0;i<array.length();i++) {
                     JSONObject o = array.getJSONObject(i);
-                    String sys_name = o.getString("name");
-                    String issue_date = o.getString("issue_date");
-                    String processor = o.getString("processor");
-                    String ram = o.getString("ram_size");
-                    String return_date = o.getString("return_date");
-                    String tag = o.getString("tag");
-                    String location = o.getString("location");
+                String sys_name=null,issue_date=null,processor=null,ram=null,return_date=null,tag=null,location=null;
+                    if(o.has("name")) {
+                        sys_name = o.getString("name");
+                    }
+                    if(o.has("issue_date")) {
+                       issue_date = o.getString("issue_date");
+                    }
+                    if(o.has("processor")) {
+                        processor = o.getString("processor");
+                    }
+                    if(o.has("ram_size")) {
+                         ram = o.getString("ram_size");
+                    }
+                    if (o.has("return_date")) {
+                         return_date = o.getString("return_date");
+                    }
+                    if(o.has("tag")) {
+                        tag = o.getString("tag");
+                    }
+                    if(o.has("location")) {
+                         location = o.getString("location");
+                    }
                     HistoryData data = new HistoryData(sys_name, tag, issue_date, return_date, processor, ram, location);
                     dataList.add(data);
                 }
