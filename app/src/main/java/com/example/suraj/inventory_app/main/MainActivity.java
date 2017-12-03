@@ -1,5 +1,7 @@
 package com.example.suraj.inventory_app.main;
 
+import android.app.ProgressDialog;
+import android.content.DialogInterface;
 import android.net.Uri;
 import android.os.Bundle;
 import android.support.v4.app.Fragment;
@@ -8,15 +10,25 @@ import android.support.design.widget.NavigationView;
 import android.support.v4.view.GravityCompat;
 import android.support.v4.widget.DrawerLayout;
 import android.support.v7.app.ActionBarDrawerToggle;
+import android.support.v7.app.AlertDialog;
 import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.Toolbar;
+import android.text.InputType;
 import android.view.Menu;
 import android.view.MenuItem;
+import android.widget.EditText;
+import android.widget.Toast;
 
+import com.android.volley.Request;
+import com.android.volley.Response;
+import com.android.volley.VolleyError;
+import com.android.volley.toolbox.StringRequest;
 import com.example.suraj.inventory_app.R;
 
 public class MainActivity extends AppCompatActivity
-        implements NavigationView.OnNavigationItemSelectedListener,Get_History.OnFragmentInteractionListener{
+        implements NavigationView.OnNavigationItemSelectedListener, Get_History.OnFragmentInteractionListener {
+
+    private ProgressDialog loading;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -73,10 +85,25 @@ public class MainActivity extends AppCompatActivity
     public boolean onNavigationItemSelected(MenuItem item) {
         // Handle navigation view item clicks here.
         int id = item.getItemId();
-        Fragment fr=null;
+        Fragment fr = null;
         if (id == R.id.nav_history) {
-            fr=new Get_History();
+            fr = new Get_History();
         } else if (id == R.id.nav_gallery) {
+            AlertDialog.Builder pass = new AlertDialog.Builder(HomeScreen.this);
+            final EditText passText = new EditText(pass.getContext());
+            passText.setHint("Enter Password Again");
+            passText.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD);
+            pass.setView(passText);
+            pass.setTitle("Step 1: Password Check");
+            pass.setNegativeButton("Cancel", null);
+            pass.setPositiveButton("Done", new DialogInterface.OnClickListener() {
+                @Override
+                public void onClick(DialogInterface dialog, int which) {
+                    checkPassword(passText.getText().toString());
+                }
+            });
+            pass.show();
+
 
         } else if (id == R.id.nav_slideshow) {
 
@@ -87,8 +114,7 @@ public class MainActivity extends AppCompatActivity
         } else if (id == R.id.nav_send) {
 
         }
-        if(fr!=null)
-        {
+        if (fr != null) {
             FragmentManager fragmentManager = getSupportFragmentManager();
             fragmentManager.beginTransaction()
                     .replace(R.id.frame_container, fr).commit();
@@ -101,5 +127,47 @@ public class MainActivity extends AppCompatActivity
     @Override
     public void onFragmentInteraction(Uri uri) {
 
+    }
+
+    private void checkPassword(final String password) {
+        String url = getString(R.string.url) + "/login";
+
+
+        StringRequest jsonReq = new StringRequest(Request.Method.POST, url,
+                new Response.Listener<String>() {
+                    @Override
+                    public void onResponse(String response) {
+                        loading.cancel();
+                        if (response.contains("True")) {
+                            barcodeScan();
+                        } else
+                            Toast.makeText(getApplicationContext(), "UserId-Password Combination not correct", Toast.LENGTH_SHORT).show();
+                    }
+                },
+                new Response.ErrorListener() {
+                    @Override
+                    public void onErrorResponse(VolleyError error) {
+                        loading.cancel();
+                        if (FixedData.isConnected(HomeScreen.this))
+                            Toast.makeText(getApplicationContext(), "Error Occurred! Try Again", Toast.LENGTH_LONG).show();
+                        else
+                            Toast.makeText(getApplicationContext(), "Connect to Internet", Toast.LENGTH_LONG).show();
+                    }
+                }) {
+            @Override
+            protected Map<String, String> getParams() throws AuthFailureError {
+                Map<String, String> param = new HashMap<String, String>();
+                param.put("UserID", FixedData.getUserID(HomeScreen.this));
+                param.put("Password", password);
+                return param;
+            }
+        };
+
+        loading = new ProgressDialog(MainActivity.this);
+        loading.setCancelable(false);
+        loading.setProgressStyle(ProgressDialog.STYLE_SPINNER);
+        loading.setMessage("Checking Password.....");
+        loading.show();
+        ServerRequest.getInstance(getApplicationContext()).addRequestQueue(jsonReq);
     }
 }

@@ -7,4 +7,11 @@
     <string name="action_settings">Settings</string>
 
     <!-- TODO: Remove or change this placeholder text -->
+    <string name="hello_blank_fragment">Hello blank fragment</string>
+
+    <!-- SharedPreferences: LogedUserDetail -->
+    <string name="userDetailSharedPref">UserDetail</string>
+    <string name="loginCheck">LoggedIn??</string>
+    <string name="LoggedUserId">L-ID</string>
+
 </resources>
