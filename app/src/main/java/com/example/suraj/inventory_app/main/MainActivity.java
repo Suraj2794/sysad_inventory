@@ -19,11 +19,17 @@ import android.view.MenuItem;
 import android.widget.EditText;
 import android.widget.Toast;
 
+import com.android.volley.AuthFailureError;
 import com.android.volley.Request;
 import com.android.volley.Response;
 import com.android.volley.VolleyError;
 import com.android.volley.toolbox.StringRequest;
 import com.example.suraj.inventory_app.R;
+import com.example.suraj.inventory_app.util.ServerRequest;
+import com.example.suraj.inventory_app.util.UtilClass;
+
+import java.util.HashMap;
+import java.util.Map;
 
 public class MainActivity extends AppCompatActivity
         implements NavigationView.OnNavigationItemSelectedListener, Get_History.OnFragmentInteractionListener {
@@ -89,7 +95,8 @@ public class MainActivity extends AppCompatActivity
         if (id == R.id.nav_history) {
             fr = new Get_History();
         } else if (id == R.id.nav_gallery) {
-            AlertDialog.Builder pass = new AlertDialog.Builder(HomeScreen.this);
+
+            AlertDialog.Builder pass = new AlertDialog.Builder(MainActivity.this);
             final EditText passText = new EditText(pass.getContext());
             passText.setHint("Enter Password Again");
             passText.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD);
@@ -139,7 +146,7 @@ public class MainActivity extends AppCompatActivity
                     public void onResponse(String response) {
                         loading.cancel();
                         if (response.contains("True")) {
-                            barcodeScan();
+//                            barcodeScan();
                         } else
                             Toast.makeText(getApplicationContext(), "UserId-Password Combination not correct", Toast.LENGTH_SHORT).show();
                     }
@@ -148,7 +155,7 @@ public class MainActivity extends AppCompatActivity
                     @Override
                     public void onErrorResponse(VolleyError error) {
                         loading.cancel();
-                        if (FixedData.isConnected(HomeScreen.this))
+                        if (UtilClass.isConnected(MainActivity.this))
                             Toast.makeText(getApplicationContext(), "Error Occurred! Try Again", Toast.LENGTH_LONG).show();
                         else
                             Toast.makeText(getApplicationContext(), "Connect to Internet", Toast.LENGTH_LONG).show();
@@ -157,7 +164,7 @@ public class MainActivity extends AppCompatActivity
             @Override
             protected Map<String, String> getParams() throws AuthFailureError {
                 Map<String, String> param = new HashMap<String, String>();
-                param.put("UserID", FixedData.getUserID(HomeScreen.this));
+                param.put("UserID", UtilClass.getUserID(MainActivity.this));
                 param.put("Password", password);
                 return param;
             }

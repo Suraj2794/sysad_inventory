@@ -9,6 +9,8 @@
     <!-- TODO: Remove or change this placeholder text -->
     <string name="hello_blank_fragment">Hello blank fragment</string>
 
+    <string name="url" translatable="false">http://10.130.4.192:8000</string>
+
     <!-- SharedPreferences: LogedUserDetail -->
     <string name="userDetailSharedPref">UserDetail</string>
     <string name="loginCheck">LoggedIn??</string>
