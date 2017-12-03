@@ -2,6 +2,7 @@ package com.example.suraj.inventory_app.main;
 
 import android.app.ProgressDialog;
 import android.content.DialogInterface;
+import android.content.Intent;
 import android.net.Uri;
 import android.os.Bundle;
 import android.support.v4.app.Fragment;
@@ -14,6 +15,7 @@ import android.support.v7.app.AlertDialog;
 import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.Toolbar;
 import android.text.InputType;
+import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.widget.EditText;
@@ -27,6 +29,7 @@ import com.android.volley.toolbox.StringRequest;
 import com.example.suraj.inventory_app.R;
 import com.example.suraj.inventory_app.util.ServerRequest;
 import com.example.suraj.inventory_app.util.UtilClass;
+import com.google.zxing.integration.android.IntentIntegrator;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -94,7 +97,11 @@ public class MainActivity extends AppCompatActivity
         Fragment fr = null;
         if (id == R.id.nav_history) {
             fr = new Get_History();
-        } else if (id == R.id.nav_gallery) {
+        } else if (id == R.id.issue) {
+            /*
+            When User selects issue, first we will recheck he password to be ensured that the same
+            user is doing request.
+             */
 
             AlertDialog.Builder pass = new AlertDialog.Builder(MainActivity.this);
             final EditText passText = new EditText(pass.getContext());
@@ -136,6 +143,11 @@ public class MainActivity extends AppCompatActivity
 
     }
 
+    /**
+     * This method checks if the password is same or not.
+     * If yes then we proceed to scan barcode.
+     * @param password
+     */
     private void checkPassword(final String password) {
         String url = getString(R.string.url) + "/login";
 
@@ -146,7 +158,7 @@ public class MainActivity extends AppCompatActivity
                     public void onResponse(String response) {
                         loading.cancel();
                         if (response.contains("True")) {
-//                            barcodeScan();
+                            barcodeScan();
                         } else
                             Toast.makeText(getApplicationContext(), "UserId-Password Combination not correct", Toast.LENGTH_SHORT).show();
                     }
@@ -176,5 +188,83 @@ public class MainActivity extends AppCompatActivity
         loading.setMessage("Checking Password.....");
         loading.show();
         ServerRequest.getInstance(getApplicationContext()).addRequestQueue(jsonReq);
+    }
+
+    /**
+     * This method is used to scan barcode.
+     * The ZXing library does the scanning and return the result in onActivityResult()
+     */
+    void barcodeScan() {
+        IntentIntegrator integrator = new IntentIntegrator(this);
+        integrator.setDesiredBarcodeFormats(IntentIntegrator.QR_CODE_TYPES);
+        integrator.setPrompt("Scan a barcode");
+        integrator.initiateScan();
+    }
+
+    /**
+     * Here data will contain the scanned string from QR.
+     * If we had many other startActivityForResult() then we would have used requestCode.
+     * But here its fine. We don't need it.
+     *
+     * Once we get the barcode we generate the issue request.
+     * @param requestCode
+     * @param resultCode
+     * @param data
+     */
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if (data != null) {
+            Log.e("Scanned QR Code is: " , ""+data);
+            issueComponent(data.getStringExtra("SCAN_RESULT"));
+        }
+    }
+
+    /**
+     * This method issues the component to the user.
+     * @param component_id Id scanned from the QR
+     */
+    private void issueComponent(final String component_id) {
+        String url = getString(R.string.url) + "/issue";
+
+        StringRequest barcode = new StringRequest(Request.Method.POST, url,
+                new Response.Listener<String>() {
+                    @Override
+                    public void onResponse(String response) {
+                        loading.cancel();
+                        if (response.contains("Done")) {
+
+                            // Issue is done... refresh Main Activity
+
+                        } else
+                            Toast.makeText(getApplicationContext(), "UserId-Barcode Combination not correct", Toast.LENGTH_SHORT).show();
+                    }
+                },
+                new Response.ErrorListener() {
+                    @Override
+                    public void onErrorResponse(VolleyError error) {
+                        loading.cancel();
+                        if (UtilClass.isConnected(MainActivity.this))
+                            Toast.makeText(getApplicationContext(), "Error Occurred! Try Again", Toast.LENGTH_LONG).show();
+                        else
+                            Toast.makeText(getApplicationContext(), "Connect to Internet", Toast.LENGTH_LONG).show();
+                    }
+                }) {
+            @Override
+            protected Map<String, String> getParams() throws AuthFailureError {
+                Map<String, String> param = new HashMap<String, String>();
+                param.put("UserID", UtilClass.getUserID(MainActivity.this));
+                param.put("Password", component_id);
+                Log.e("Param", param.toString());
+                return param;
+            }
+        };
+
+        loading = new ProgressDialog(MainActivity.this);
+        loading.setCancelable(false);
+        loading.setProgressStyle(ProgressDialog.STYLE_SPINNER);
+        loading.setMessage("Checking Barcode.....");
+        loading.show();
+        ServerRequest.getInstance(getApplicationContext()).addRequestQueue(barcode);
     }
 }
