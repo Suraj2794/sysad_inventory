@@ -27,6 +27,7 @@ import com.android.volley.Response;
 import com.android.volley.VolleyError;
 import com.android.volley.toolbox.StringRequest;
 import com.example.suraj.inventory_app.R;
+import com.example.suraj.inventory_app.util.Password;
 import com.example.suraj.inventory_app.util.ServerRequest;
 import com.example.suraj.inventory_app.util.UtilClass;
 import com.google.zxing.integration.android.IntentIntegrator;
@@ -38,6 +39,9 @@ public class MainActivity extends AppCompatActivity
         implements NavigationView.OnNavigationItemSelectedListener, Get_History.OnFragmentInteractionListener {
 
     private ProgressDialog loading;
+    String student_scanned_id = null;
+    boolean ISSUE_ICARD_SCAN_DONE = false;
+    boolean LOGIN_DONE = false;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -46,6 +50,9 @@ public class MainActivity extends AppCompatActivity
         Toolbar toolbar = (Toolbar) findViewById(R.id.toolbar);
         setSupportActionBar(toolbar);
 
+        if(!LOGIN_DONE){
+            doLogin();
+        }
 
         DrawerLayout drawer = (DrawerLayout) findViewById(R.id.drawer_layout);
         ActionBarDrawerToggle toggle = new ActionBarDrawerToggle(
@@ -55,6 +62,49 @@ public class MainActivity extends AppCompatActivity
 
         NavigationView navigationView = (NavigationView) findViewById(R.id.nav_view);
         navigationView.setNavigationItemSelectedListener(this);
+
+        ISSUE_ICARD_SCAN_DONE = false;
+    }
+
+    private void doLogin() {
+        AlertDialog.Builder pass = new AlertDialog.Builder(MainActivity.this);
+        final EditText passText = new EditText(pass.getContext());
+        passText.setHint("Sysad Password");
+        passText.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD);
+        pass.setView(passText);
+        pass.setTitle("Enter Password");
+        pass.setNegativeButton("Cancel", new DialogInterface.OnClickListener() {
+            @Override
+            public void onClick(DialogInterface dialogInterface, int i) {
+                finish();
+            }
+        });
+        pass.setPositiveButton("Login", new DialogInterface.OnClickListener() {
+            @Override
+            public void onClick(DialogInterface dialog, int which) {
+                if (convertToMD5(passText.getText().toString()).equals(Password.password)) {
+                    LOGIN_DONE = true;
+                } else {
+                    Toast.makeText(MainActivity.this, "Incorrect Password.", Toast.LENGTH_LONG).show();
+                    doLogin();
+                }
+            }
+        });
+        pass.show();
+    }
+
+    public String convertToMD5(String password) {
+        try {
+            java.security.MessageDigest md = java.security.MessageDigest.getInstance("MD5");
+            byte[] array = md.digest(password.getBytes());
+            StringBuffer sb = new StringBuffer();
+            for (int i = 0; i < array.length; ++i) {
+                sb.append(Integer.toHexString((array[i] & 0xFF) | 0x100).substring(1, 3));
+            }
+            return sb.toString();
+        } catch (java.security.NoSuchAlgorithmException e) {
+        }
+        return null;
     }
 
     @Override
@@ -62,6 +112,7 @@ public class MainActivity extends AppCompatActivity
         DrawerLayout drawer = (DrawerLayout) findViewById(R.id.drawer_layout);
         if (drawer.isDrawerOpen(GravityCompat.START)) {
             drawer.closeDrawer(GravityCompat.START);
+            ISSUE_ICARD_SCAN_DONE = false;
         } else {
             super.onBackPressed();
         }
@@ -102,24 +153,9 @@ public class MainActivity extends AppCompatActivity
             When User selects issue, first we will recheck he password to be ensured that the same
             user is doing request.
              */
+            barcodeScan();
 
-            AlertDialog.Builder pass = new AlertDialog.Builder(MainActivity.this);
-            final EditText passText = new EditText(pass.getContext());
-            passText.setHint("Enter Password Again");
-            passText.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD);
-            pass.setView(passText);
-            pass.setTitle("Step 1: Password Check");
-            pass.setNegativeButton("Cancel", null);
-            pass.setPositiveButton("Done", new DialogInterface.OnClickListener() {
-                @Override
-                public void onClick(DialogInterface dialog, int which) {
-                    checkPassword(passText.getText().toString());
-                }
-            });
-            pass.show();
-
-
-        } else if (id == R.id.nav_slideshow) {
+        } else if (id == R.id.component_return) {
 
         } else if (id == R.id.nav_manage) {
 
@@ -144,61 +180,22 @@ public class MainActivity extends AppCompatActivity
     }
 
     /**
-     * This method checks if the password is same or not.
-     * If yes then we proceed to scan barcode.
-     * @param password
-     */
-    private void checkPassword(final String password) {
-        String url = getString(R.string.url) + "/login";
-
-
-        StringRequest jsonReq = new StringRequest(Request.Method.POST, url,
-                new Response.Listener<String>() {
-                    @Override
-                    public void onResponse(String response) {
-                        loading.cancel();
-                        if (response.contains("True")) {
-                            barcodeScan();
-                        } else
-                            Toast.makeText(getApplicationContext(), "UserId-Password Combination not correct", Toast.LENGTH_SHORT).show();
-                    }
-                },
-                new Response.ErrorListener() {
-                    @Override
-                    public void onErrorResponse(VolleyError error) {
-                        loading.cancel();
-                        if (UtilClass.isConnected(MainActivity.this))
-                            Toast.makeText(getApplicationContext(), "Error Occurred! Try Again", Toast.LENGTH_LONG).show();
-                        else
-                            Toast.makeText(getApplicationContext(), "Connect to Internet", Toast.LENGTH_LONG).show();
-                    }
-                }) {
-            @Override
-            protected Map<String, String> getParams() throws AuthFailureError {
-                Map<String, String> param = new HashMap<String, String>();
-                param.put("UserID", "");
-                param.put("Password", password);
-                return param;
-            }
-        };
-
-        loading = new ProgressDialog(MainActivity.this);
-        loading.setCancelable(false);
-        loading.setProgressStyle(ProgressDialog.STYLE_SPINNER);
-        loading.setMessage("Checking Password.....");
-        loading.show();
-        ServerRequest.getInstance(getApplicationContext()).addRequestQueue(jsonReq);
-    }
-
-    /**
      * This method is used to scan barcode.
      * The ZXing library does the scanning and return the result in onActivityResult()
      */
     void barcodeScan() {
-        IntentIntegrator integrator = new IntentIntegrator(this);
-        integrator.setDesiredBarcodeFormats(IntentIntegrator.QR_CODE_TYPES);
-        integrator.setPrompt("Scan a barcode");
-        integrator.initiateScan();
+        if(!ISSUE_ICARD_SCAN_DONE || student_scanned_id == null) {
+            IntentIntegrator integrator = new IntentIntegrator(this);
+            integrator.setDesiredBarcodeFormats(IntentIntegrator.ONE_D_CODE_TYPES);
+            integrator.setPrompt("Scan Barcode on I-card");
+            integrator.initiateScan();
+        }
+        else{
+            IntentIntegrator integrator = new IntentIntegrator(this);
+            integrator.setDesiredBarcodeFormats(IntentIntegrator.QR_CODE_TYPES);
+            integrator.setPrompt("Scan QR Code on Component");
+            integrator.initiateScan();
+        }
     }
 
     /**
@@ -215,8 +212,16 @@ public class MainActivity extends AppCompatActivity
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
         if (data != null) {
-            Log.e("Scanned QR Code is: " , ""+data);
-            issueComponent(data.getStringExtra("SCAN_RESULT"));
+            if (!ISSUE_ICARD_SCAN_DONE){
+                Log.e("Scanned Barcode is: " , ""+data);
+                ISSUE_ICARD_SCAN_DONE = true;
+                student_scanned_id = data.getStringExtra("SCAN_RESULT");
+                barcodeScan();
+            }
+            else {
+                Log.e("Scanned QR Code is: ", "" + data);
+                issueComponent(data.getStringExtra("SCAN_RESULT"));
+            }
         }
     }
 
@@ -233,11 +238,14 @@ public class MainActivity extends AppCompatActivity
                     public void onResponse(String response) {
                         loading.cancel();
                         if (response.contains("Done")) {
+                            Toast.makeText(getApplicationContext(),"System Issued",Toast.LENGTH_LONG).show();
+                            ISSUE_ICARD_SCAN_DONE = false;
+                            student_scanned_id = null;
 
-                            // Issue is done... refresh Main Activity
-
-                        } else
-                            Toast.makeText(getApplicationContext(), "UserId-Barcode Combination not correct", Toast.LENGTH_SHORT).show();
+                        } else if(response.contains("Inconsistent"))
+                            Toast.makeText(getApplicationContext(), "System already Issued!", Toast.LENGTH_SHORT).show();
+                        else
+                            Toast.makeText(getApplicationContext(), "Database Connection Error!", Toast.LENGTH_SHORT).show();
                     }
                 },
                 new Response.ErrorListener() {
@@ -253,8 +261,8 @@ public class MainActivity extends AppCompatActivity
             @Override
             protected Map<String, String> getParams() throws AuthFailureError {
                 Map<String, String> param = new HashMap<String, String>();
-                param.put("UserID", "");
-                param.put("Password", component_id);
+                param.put("user_id", student_scanned_id);
+                param.put("component_id", component_id);
                 Log.e("Param", param.toString());
                 return param;
             }
