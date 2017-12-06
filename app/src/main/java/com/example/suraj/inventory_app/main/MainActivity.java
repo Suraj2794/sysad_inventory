@@ -95,7 +95,7 @@ public class MainActivity extends AppCompatActivity
         // Handle navigation view item clicks here.
         int id = item.getItemId();
         Fragment fr = null;
-        if (id == R.id.nav_history) {
+        if (id == R.id.search) {
             fr = new Get_History();
         } else if (id == R.id.issue) {
             /*
@@ -176,7 +176,7 @@ public class MainActivity extends AppCompatActivity
             @Override
             protected Map<String, String> getParams() throws AuthFailureError {
                 Map<String, String> param = new HashMap<String, String>();
-                param.put("UserID", UtilClass.getUserID(MainActivity.this));
+                param.put("UserID", "");
                 param.put("Password", password);
                 return param;
             }
@@ -253,7 +253,7 @@ public class MainActivity extends AppCompatActivity
             @Override
             protected Map<String, String> getParams() throws AuthFailureError {
                 Map<String, String> param = new HashMap<String, String>();
-                param.put("UserID", UtilClass.getUserID(MainActivity.this));
+                param.put("UserID", "");
                 param.put("Password", component_id);
                 Log.e("Param", param.toString());
                 return param;
