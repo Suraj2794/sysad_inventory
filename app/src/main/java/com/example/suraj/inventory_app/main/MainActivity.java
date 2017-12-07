@@ -31,6 +31,7 @@ import com.example.suraj.inventory_app.util.Password;
 import com.example.suraj.inventory_app.util.ServerRequest;
 import com.example.suraj.inventory_app.util.UtilClass;
 import com.google.zxing.integration.android.IntentIntegrator;
+import com.google.zxing.integration.android.IntentResult;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -38,6 +39,9 @@ import java.util.Map;
 public class MainActivity extends AppCompatActivity
         implements NavigationView.OnNavigationItemSelectedListener, Get_History.OnFragmentInteractionListener {
 
+    private static final int ISSUE_ICARD_SCAN_CODE = 1;
+    private static final int ISSUE_QR_SCAN_CODE = 2;
+    private static final int RETRUN_QR_SCAN_CODE = 3;
     private ProgressDialog loading;
     String student_scanned_id = null;
     boolean ISSUE_ICARD_SCAN_DONE = false;
@@ -50,7 +54,7 @@ public class MainActivity extends AppCompatActivity
         Toolbar toolbar = (Toolbar) findViewById(R.id.toolbar);
         setSupportActionBar(toolbar);
 
-        if(!LOGIN_DONE){
+        if (!LOGIN_DONE) {
             doLogin();
         }
 
@@ -153,9 +157,10 @@ public class MainActivity extends AppCompatActivity
             When User selects issue, first we will recheck he password to be ensured that the same
             user is doing request.
              */
-            barcodeScan();
+            barcodeScan(ISSUE_ICARD_SCAN_CODE);
 
         } else if (id == R.id.component_return) {
+            barcodeScan(RETRUN_QR_SCAN_CODE);
 
         } else if (id == R.id.nav_manage) {
 
@@ -183,18 +188,24 @@ public class MainActivity extends AppCompatActivity
      * This method is used to scan barcode.
      * The ZXing library does the scanning and return the result in onActivityResult()
      */
-    void barcodeScan() {
-        if(!ISSUE_ICARD_SCAN_DONE || student_scanned_id == null) {
-            IntentIntegrator integrator = new IntentIntegrator(this);
-            integrator.setDesiredBarcodeFormats(IntentIntegrator.ONE_D_CODE_TYPES);
-            integrator.setPrompt("Scan Barcode on I-card");
-            integrator.initiateScan();
-        }
-        else{
-            IntentIntegrator integrator = new IntentIntegrator(this);
-            integrator.setDesiredBarcodeFormats(IntentIntegrator.QR_CODE_TYPES);
-            integrator.setPrompt("Scan QR Code on Component");
-            integrator.initiateScan();
+    void barcodeScan(int request_code) {
+        IntentIntegrator integrator = new IntentIntegrator(this);
+        switch (request_code) {
+            case ISSUE_ICARD_SCAN_CODE:
+                integrator.setDesiredBarcodeFormats(IntentIntegrator.ONE_D_CODE_TYPES);
+                integrator.setPrompt("Scan Barcode on I-card");
+                startActivityForResult(integrator.createScanIntent(), ISSUE_ICARD_SCAN_CODE);
+                break;
+            case ISSUE_QR_SCAN_CODE:
+                integrator.setDesiredBarcodeFormats(IntentIntegrator.QR_CODE_TYPES);
+                integrator.setPrompt("Scan QR Code on Component");
+                startActivityForResult(integrator.createScanIntent(), ISSUE_QR_SCAN_CODE);
+                break;
+            case RETRUN_QR_SCAN_CODE:
+                integrator.setDesiredBarcodeFormats(IntentIntegrator.QR_CODE_TYPES);
+                integrator.setPrompt("Scan QR Code on Component");
+                startActivityForResult(integrator.createScanIntent(), RETRUN_QR_SCAN_CODE);
+                break;
         }
     }
 
@@ -202,31 +213,88 @@ public class MainActivity extends AppCompatActivity
      * Here data will contain the scanned string from QR.
      * If we had many other startActivityForResult() then we would have used requestCode.
      * But here its fine. We don't need it.
-     *
+     * <p>
      * Once we get the barcode we generate the issue request.
+     *
      * @param requestCode
      * @param resultCode
      * @param data
      */
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
-        super.onActivityResult(requestCode, resultCode, data);
+        IntentResult result = IntentIntegrator.parseActivityResult(requestCode, resultCode, data);
         if (data != null) {
-            if (!ISSUE_ICARD_SCAN_DONE){
-                Log.e("Scanned Barcode is: " , ""+data);
-                ISSUE_ICARD_SCAN_DONE = true;
-                student_scanned_id = data.getStringExtra("SCAN_RESULT");
-                barcodeScan();
+            switch (requestCode) {
+                case ISSUE_ICARD_SCAN_CODE:
+                    Log.e("Scanned Barcode is: ", "" + data);
+                    student_scanned_id = data.getStringExtra("SCAN_RESULT");
+                    barcodeScan(ISSUE_QR_SCAN_CODE);
+                    break;
+                case ISSUE_QR_SCAN_CODE:
+                    Log.e("Scanned QR Code is: ", "" + data);
+                    issueComponent(data.getStringExtra("SCAN_RESULT"));
+                    break;
+                case RETRUN_QR_SCAN_CODE:
+                    Log.e("Scanned QR Code is: ", "" + data);
+                    returnComponent(data.getStringExtra("SCAN_RESULT"));
+                    break;
             }
-            else {
-                Log.e("Scanned QR Code is: ", "" + data);
-                issueComponent(data.getStringExtra("SCAN_RESULT"));
-            }
+        } else {
+            Toast.makeText(this, "Scan Cancelled", Toast.LENGTH_LONG).show();
         }
     }
 
     /**
+     * This method return the component to the user.
+     *
+     * @param component_id Id scanned from the QR
+     */
+    private void returnComponent(final String component_id) {
+        String url = getString(R.string.url) + "/return";
+
+        StringRequest barcode = new StringRequest(Request.Method.POST, url,
+                new Response.Listener<String>() {
+                    @Override
+                    public void onResponse(String response) {
+                        loading.cancel();
+                        if (response.contains("Done")) {
+                            Toast.makeText(getApplicationContext(), "System Returned", Toast.LENGTH_LONG).show();
+                        } else if (response.contains("Inconsistent"))
+                            Toast.makeText(getApplicationContext(), "System not Issued!", Toast.LENGTH_SHORT).show();
+                        else
+                            Toast.makeText(getApplicationContext(), "Database Issue!", Toast.LENGTH_SHORT).show();
+                    }
+                },
+                new Response.ErrorListener() {
+                    @Override
+                    public void onErrorResponse(VolleyError error) {
+                        loading.cancel();
+                        if (UtilClass.isConnected(MainActivity.this))
+                            Toast.makeText(getApplicationContext(), "Error Occurred! Try Again", Toast.LENGTH_LONG).show();
+                        else
+                            Toast.makeText(getApplicationContext(), "Connect to Internet", Toast.LENGTH_LONG).show();
+                    }
+                }) {
+            @Override
+            protected Map<String, String> getParams() throws AuthFailureError {
+                Map<String, String> param = new HashMap<String, String>();
+                param.put("component_id", component_id);
+                Log.e("Param", param.toString());
+                return param;
+            }
+        };
+
+        loading = new ProgressDialog(MainActivity.this);
+        loading.setCancelable(false);
+        loading.setProgressStyle(ProgressDialog.STYLE_SPINNER);
+        loading.setMessage("Checking Barcode.....");
+        loading.show();
+        ServerRequest.getInstance(getApplicationContext()).addRequestQueue(barcode);
+    }
+
+    /**
      * This method issues the component to the user.
+     *
      * @param component_id Id scanned from the QR
      */
     private void issueComponent(final String component_id) {
@@ -238,11 +306,11 @@ public class MainActivity extends AppCompatActivity
                     public void onResponse(String response) {
                         loading.cancel();
                         if (response.contains("Done")) {
-                            Toast.makeText(getApplicationContext(),"System Issued",Toast.LENGTH_LONG).show();
+                            Toast.makeText(getApplicationContext(), "System Issued", Toast.LENGTH_LONG).show();
                             ISSUE_ICARD_SCAN_DONE = false;
                             student_scanned_id = null;
 
-                        } else if(response.contains("Inconsistent"))
+                        } else if (response.contains("Inconsistent"))
                             Toast.makeText(getApplicationContext(), "System already Issued!", Toast.LENGTH_SHORT).show();
                         else
                             Toast.makeText(getApplicationContext(), "Database Connection Error!", Toast.LENGTH_SHORT).show();
